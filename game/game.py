@@ -17,15 +17,23 @@ CellPosition = collections.namedtuple('CellPosition', ['x', 'y'])
 
 
 class Board:
+    """
+    Represents a square board for the 2048 game. It supports special actions like "applying force" in a given direction
+        or "merging" similar cells.
+    """
+
     def __init__(self, size: int):
         self.board = None
         self.size = size
         self.reset()
 
     def set_random_empty_cell(self, value: int):
-        # Handle edge case when there are no empty cells
-        cell = random.choice(self.empty_cell_positions)
-        self.set_cell(cell, value)
+        empty_cells = self.empty_cell_positions
+        if len(empty_cells) == 0:
+            raise ValueError('There are no empty cells in the board')
+
+        cell = random.choice(empty_cells)
+        self.set_cell_value(cell, value)
 
     def apply_force(self, direction: Direction) -> bool:
         """
@@ -101,7 +109,7 @@ class Board:
             cells = self.cells_positions_as_columns()
             for column in cells:
                 for cell_position in column:
-                    current_cell_value = self.get_cell(cell_position)
+                    current_cell_value = self.get_cell_value(cell_position)
                     if current_cell_value is None:
                         continue
 
@@ -109,20 +117,20 @@ class Board:
                         continue
 
                     cell_below_position = CellPosition(cell_position.x, cell_position.y + 1)
-                    cell_below_value = self.get_cell(cell_below_position)
+                    cell_below_value = self.get_cell_value(cell_below_position)
 
                     if current_cell_value == cell_below_value:
                         current_cell_value *= 2
-                        self.set_cell(cell_position, current_cell_value)
-                        self.set_cell(cell_below_position, None)
+                        self.set_cell_value(cell_position, current_cell_value)
+                        self.set_cell_value(cell_below_position, None)
 
                         cell_was_merged = True
 
         if direction == Direction.DOWN:
             cells = self.cells_positions_as_columns()
             for column in cells:
-                for cell_position in column[::-1]:
-                    current_cell_value = self.get_cell(cell_position)
+                for cell_position in column:
+                    current_cell_value = self.get_cell_value(cell_position)
                     if current_cell_value is None:
                         continue
 
@@ -130,12 +138,12 @@ class Board:
                         continue
 
                     cell_below_position = CellPosition(cell_position.x, cell_position.y - 1)
-                    cell_below_value = self.get_cell(cell_below_position)
+                    cell_below_value = self.get_cell_value(cell_below_position)
 
                     if current_cell_value == cell_below_value:
                         current_cell_value *= 2
-                        self.set_cell(cell_position, current_cell_value)
-                        self.set_cell(cell_below_position, None)
+                        self.set_cell_value(cell_position, current_cell_value)
+                        self.set_cell_value(cell_below_position, None)
 
                         cell_was_merged = True
 
@@ -143,7 +151,7 @@ class Board:
             cells = self.cells_positions_as_rows()
             for row in cells:
                 for cell_position in row:
-                    current_cell_value = self.get_cell(cell_position)
+                    current_cell_value = self.get_cell_value(cell_position)
                     if current_cell_value is None:
                         continue
 
@@ -151,20 +159,20 @@ class Board:
                         continue
 
                     cell_below_position = CellPosition(cell_position.x + 1, cell_position.y)
-                    cell_below_value = self.get_cell(cell_below_position)
+                    cell_below_value = self.get_cell_value(cell_below_position)
 
                     if current_cell_value == cell_below_value:
                         current_cell_value *= 2
-                        self.set_cell(cell_position, current_cell_value)
-                        self.set_cell(cell_below_position, None)
+                        self.set_cell_value(cell_position, current_cell_value)
+                        self.set_cell_value(cell_below_position, None)
 
                         cell_was_merged = True
 
         if direction == Direction.LEFT:
             cells = self.cells_positions_as_rows()
             for row in cells:
-                for cell_position in row[::-1]:
-                    current_cell_value = self.get_cell(cell_position)
+                for cell_position in row:
+                    current_cell_value = self.get_cell_value(cell_position)
                     if current_cell_value is None:
                         continue
 
@@ -172,12 +180,12 @@ class Board:
                         continue
 
                     cell_below_position = CellPosition(cell_position.x - 1, cell_position.y)
-                    cell_below_value = self.get_cell(cell_below_position)
+                    cell_below_value = self.get_cell_value(cell_below_position)
 
                     if current_cell_value == cell_below_value:
                         current_cell_value *= 2
-                        self.set_cell(cell_position, current_cell_value)
-                        self.set_cell(cell_below_position, None)
+                        self.set_cell_value(cell_position, current_cell_value)
+                        self.set_cell_value(cell_below_position, None)
 
                         cell_was_merged = True
 
@@ -195,19 +203,19 @@ class Board:
     def is_cell_empty(self, position: CellPosition) -> bool:
         return self.board[position.y][position.x] is None
 
-    def set_cell(self, position: CellPosition, number: Optional[int]):
+    def set_cell_value(self, position: CellPosition, number: Optional[int]):
         self.board[position.y][position.x] = number
 
-    def get_cell(self, position: CellPosition) -> Optional[int]:
+    def get_cell_value(self, position: CellPosition) -> Optional[int]:
         return self.board[position.y][position.x]
 
     def move_cell(self, position: CellPosition, target_position: CellPosition):
         if not self.is_cell_empty(target_position):
             raise ValueError(f'Cannot move cell {position} to non-empty cell {target_position}')
 
-        current_value = self.get_cell(position)
-        self.set_cell(target_position, current_value)
-        self.set_cell(position, None)
+        current_value = self.get_cell_value(position)
+        self.set_cell_value(target_position, current_value)
+        self.set_cell_value(position, None)
 
     @property
     def empty_cell_positions(self) -> List[CellPosition]:
@@ -220,7 +228,7 @@ class Board:
             for y in range(self.size):
                 cell_position = CellPosition(x, y)
 
-                if self.get_cell(cell_position) is None:
+                if self.get_cell_value(cell_position) is None:
                     result.append(cell_position)
         return result
 
@@ -235,7 +243,7 @@ class Board:
             for y in range(self.size):
                 cell_position = CellPosition(x, y)
 
-                value = self.get_cell(cell_position)
+                value = self.get_cell_value(cell_position)
                 if value is not None:
                     result.add(value)
 
