@@ -1,9 +1,9 @@
 import collections
 import enum
 import random
-from typing import Optional, List
+from typing import Optional, List, Set
 
-BOARD_SIZE = 4
+CONVENTIONAL_BOARD_SIZE = 4
 
 
 class Direction(enum.Enum):
@@ -17,21 +17,26 @@ CellPosition = collections.namedtuple('CellPosition', ['x', 'y'])
 
 
 class Board:
-    def __init__(self):
+    def __init__(self, size: int):
         self.board = None
+        self.size = size
         self.reset()
 
     def set_random_empty_cell(self, value: int):
-        # Handle edge case when there is no empty cells
-        cell = random.choice(self.empty_cells)
+        # Handle edge case when there are no empty cells
+        cell = random.choice(self.empty_cell_positions)
         self.set_cell(cell, value)
 
-    def apply_force(self, direction: Direction):
+    def apply_force(self, direction: Direction) -> bool:
         """
         Applies "force" on the board. Moves all the cells towards the specified direction if possible.
+
+        Returns True if at least one cell was moved.
         """
+        cell_was_moved = False
+
         if direction == Direction.UP:
-            cells = self.cells_as_columns()
+            cells = self.cells_positions_as_columns()
             for column in cells:
                 for cell_position in column:
                     if self.is_cell_empty(cell_position):
@@ -39,22 +44,24 @@ class Board:
 
                     furthest_position = self.get_furthest_empty_cell(column, direction)
                     if furthest_position and furthest_position.y < cell_position.y:
+                        cell_was_moved = True
                         self.move_cell(cell_position, furthest_position)
 
         if direction == Direction.DOWN:
-            cells = self.cells_as_columns()
+            cells = self.cells_positions_as_columns()
             for column in cells:
                 # Iterate over the column flipped
-                for cell_position in column[::-1]:
+                for cell_position in column:
                     if self.is_cell_empty(cell_position):
                         continue
 
                     furthest_position = self.get_furthest_empty_cell(column, direction)
                     if furthest_position and furthest_position.y > cell_position.y:
+                        cell_was_moved = True
                         self.move_cell(cell_position, furthest_position)
 
         if direction == Direction.RIGHT:
-            cells = self.cells_as_rows()
+            cells = self.cells_positions_as_rows()
             for row in cells:
                 for cell_position in row:
                     if self.is_cell_empty(cell_position):
@@ -62,28 +69,128 @@ class Board:
 
                     furthest_position = self.get_furthest_empty_cell(row, direction)
                     if furthest_position and furthest_position.x > cell_position.x:
+                        cell_was_moved = True
                         self.move_cell(cell_position, furthest_position)
 
         if direction == Direction.LEFT:
-            cells = self.cells_as_rows()
+            cells = self.cells_positions_as_rows()
             for row in cells:
-                # Iterate over the row flipped, starting from the first entry
-                for cell_position in row[::-1]:
+                # Iterate over the row flipped, because we want to look
+                for cell_position in row:
                     if self.is_cell_empty(cell_position):
                         continue
 
                     furthest_position = self.get_furthest_empty_cell(row, direction)
                     if furthest_position and furthest_position.x < cell_position.x:
+                        cell_was_moved = True
                         self.move_cell(cell_position, furthest_position)
 
-    def merge_cells(self, direction: Direction):
-        pass
+        return cell_was_moved
+
+    def merge_cells(self, direction: Direction) -> bool:
+        """
+        Merges 2 adjacent cells if they posses the same value, based on the direction.
+        It may be seen as though a force was applied in a specified direction and the cells which are adjacent
+            and similar are "squeezed" together and become one.
+
+        Returns True if at least one cell was merged.
+        """
+        cell_was_merged = False
+
+        if direction == Direction.UP:
+            cells = self.cells_positions_as_columns()
+            for column in cells:
+                for cell_position in column:
+                    current_cell_value = self.get_cell(cell_position)
+                    if current_cell_value is None:
+                        continue
+
+                    if cell_position.y == self.size - 1:
+                        continue
+
+                    cell_below_position = CellPosition(cell_position.x, cell_position.y + 1)
+                    cell_below_value = self.get_cell(cell_below_position)
+
+                    if current_cell_value == cell_below_value:
+                        current_cell_value *= 2
+                        self.set_cell(cell_position, current_cell_value)
+                        self.set_cell(cell_below_position, None)
+
+                        cell_was_merged = True
+
+        if direction == Direction.DOWN:
+            cells = self.cells_positions_as_columns()
+            for column in cells:
+                for cell_position in column[::-1]:
+                    current_cell_value = self.get_cell(cell_position)
+                    if current_cell_value is None:
+                        continue
+
+                    if cell_position.y == 0:
+                        continue
+
+                    cell_below_position = CellPosition(cell_position.x, cell_position.y - 1)
+                    cell_below_value = self.get_cell(cell_below_position)
+
+                    if current_cell_value == cell_below_value:
+                        current_cell_value *= 2
+                        self.set_cell(cell_position, current_cell_value)
+                        self.set_cell(cell_below_position, None)
+
+                        cell_was_merged = True
+
+        if direction == Direction.RIGHT:
+            cells = self.cells_positions_as_rows()
+            for row in cells:
+                for cell_position in row:
+                    current_cell_value = self.get_cell(cell_position)
+                    if current_cell_value is None:
+                        continue
+
+                    if cell_position.x == self.size - 1:
+                        continue
+
+                    cell_below_position = CellPosition(cell_position.x + 1, cell_position.y)
+                    cell_below_value = self.get_cell(cell_below_position)
+
+                    if current_cell_value == cell_below_value:
+                        current_cell_value *= 2
+                        self.set_cell(cell_position, current_cell_value)
+                        self.set_cell(cell_below_position, None)
+
+                        cell_was_merged = True
+
+        if direction == Direction.LEFT:
+            cells = self.cells_positions_as_rows()
+            for row in cells:
+                for cell_position in row[::-1]:
+                    current_cell_value = self.get_cell(cell_position)
+                    if current_cell_value is None:
+                        continue
+
+                    if cell_position.x == 0:
+                        continue
+
+                    cell_below_position = CellPosition(cell_position.x - 1, cell_position.y)
+                    cell_below_value = self.get_cell(cell_below_position)
+
+                    if current_cell_value == cell_below_value:
+                        current_cell_value *= 2
+                        self.set_cell(cell_position, current_cell_value)
+                        self.set_cell(cell_below_position, None)
+
+                        cell_was_merged = True
+
+        return cell_was_merged
 
     def reset(self):
         self.board = []
 
-        for i in range(BOARD_SIZE):
-            self.board.append([None, None, None, None])
+        for i in range(self.size):
+            row = []
+            for j in range(self.size):
+                row.append(None)
+            self.board.append(row)
 
     def is_cell_empty(self, position: CellPosition) -> bool:
         return self.board[position.y][position.x] is None
@@ -103,30 +210,51 @@ class Board:
         self.set_cell(position, None)
 
     @property
-    def empty_cells(self) -> List[CellPosition]:
+    def empty_cell_positions(self) -> List[CellPosition]:
+        """
+        Returns all the cell positions for empty cells.
+        :return:
+        """
         result = []
-        for x in range(BOARD_SIZE):
-            for y in range(BOARD_SIZE):
+        for x in range(self.size):
+            for y in range(self.size):
                 cell_position = CellPosition(x, y)
 
                 if self.get_cell(cell_position) is None:
                     result.append(cell_position)
         return result
 
-    def cells_as_rows(self) -> List[CellPosition]:
+    @property
+    def unique_cell_values(self) -> Set[int]:
+        """
+        Returns all the values existing in the board cells.
+        """
+        result = set()
+
+        for x in range(self.size):
+            for y in range(self.size):
+                cell_position = CellPosition(x, y)
+
+                value = self.get_cell(cell_position)
+                if value is not None:
+                    result.add(value)
+
+        return result
+
+    def cells_positions_as_rows(self) -> List[CellPosition]:
         result = []
-        for y in range(BOARD_SIZE):
+        for y in range(self.size):
             row = []
-            for x in range(BOARD_SIZE):
+            for x in range(self.size):
                 row.append(CellPosition(x, y))
             result.append(row)
         return result
 
-    def cells_as_columns(self) -> List[CellPosition]:
+    def cells_positions_as_columns(self) -> List[CellPosition]:
         result = []
-        for x in range(BOARD_SIZE):
+        for x in range(self.size):
             row = []
-            for y in range(BOARD_SIZE):
+            for y in range(self.size):
                 row.append(CellPosition(x, y))
             result.append(row)
         return result
@@ -159,14 +287,14 @@ class Board:
                 else:
                     result += str(number)
                 result += " "
-            if i != BOARD_SIZE - 1:
+            if i != self.size - 1:
                 result += "\n"
         return result
 
 
 class Game2048:
     def __init__(self):
-        self.board = Board()
+        self.board = Board(CONVENTIONAL_BOARD_SIZE)
         self.reset()
 
     def reset(self):
@@ -181,9 +309,26 @@ class Game2048:
         """
         Returns True if the game is over.
         """
-        return False
+        return self.is_win
 
-    def move(self, direction: Direction):
+    @property
+    def is_win(self) -> bool:
+        return 2048 in self.board.unique_cell_values
+
+    def move(self, direction: Direction) -> bool:
+        """
+        Makes a game move based on the specified direction.
+        Returns True if the move had any effect on the board. (Some cell moved or a merge had happened)
+        """
+        applied_force_had_effect = self.board.apply_force(direction)
+        merge_had_effect = self.board.merge_cells(direction)
         self.board.apply_force(direction)
-        self.board.merge_cells(direction)
-        self.board.apply_force(direction)
+
+        move_had_any_effect = applied_force_had_effect or merge_had_effect
+        if not move_had_any_effect:
+            return False
+
+        if len(self.board.empty_cell_positions) > 0:
+            self.board.set_random_empty_cell(2)
+
+        return True

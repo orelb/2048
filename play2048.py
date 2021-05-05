@@ -28,5 +28,8 @@ while not game.is_over:
         print('Invalid input. Please try again.')
         continue
 
-    game.move(direction)
+    move_had_effect = game.move(direction)
+    if not move_had_effect:
+        print('Illegal move. Please try again.')
+
     print(str(game.board))
